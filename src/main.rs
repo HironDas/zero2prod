@@ -11,7 +11,9 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address).expect("Failed to bind random port");
 
     let configuration = get_configuration().expect("Failed to read configuration");
-    let db_pool = PgPool::connect(&configuration.database.connection_string()).await.expect("Failed to connect to Postgres");
+    let db_pool = PgPool::connect(&configuration.database.connection_string())
+        .await
+        .expect("Failed to connect to Postgres");
     // Bubble up the io::Error if we failed to bind the address
     // Otherwise call .await on our Server
     run(listener, db_pool.clone())?.await

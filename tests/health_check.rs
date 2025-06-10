@@ -1,8 +1,8 @@
 //! tests/health_check.rs
 use std::net::{SocketAddr, TcpListener};
 
-use sqlx::{Connection, PgConnection, PgPool};
 use sqlx::Executor;
+use sqlx::{Connection, PgConnection, PgPool};
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 
 #[tokio::test]
@@ -98,7 +98,8 @@ async fn spawn_app() -> TestApp {
     let mut configuration = get_configuration().expect("Failed to read configuration");
     configuration.database.database_name = format!("zero2prod_test_{}", port);
     let connection_pool = configure_database(&configuration.database).await;
-    let server = zero2prod::startup::run(listener, connection_pool.clone()).expect("Failed to bind address");
+    let server =
+        zero2prod::startup::run(listener, connection_pool.clone()).expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
     let address = format!("http://127.0.0.1:{}", port);
@@ -110,7 +111,7 @@ async fn spawn_app() -> TestApp {
 }
 
 // Test Isolation
-pub async fn configure_database(config: &DatabaseSettings)-> PgPool{
+pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let mut connection = PgConnection::connect(&config.connection_string_without_db())
         .await
         .expect("Failed to connect to Postgres");

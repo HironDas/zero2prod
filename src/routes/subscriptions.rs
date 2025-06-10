@@ -20,14 +20,12 @@ pub async fn subscribe(form: web::Form<FromData>, pool: web::Data<PgPool>) -> Ht
         Utc::now()
     )
     .execute(pool.get_ref())
-    .await{
-        Ok(_) => {
-            HttpResponse::Ok().finish()
-        }
+    .await
+    {
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
-           println!("Failed to save subscription: {}", e);
+            println!("Failed to save subscription: {}", e);
             return HttpResponse::InternalServerError().finish();
         }
     }
-
 }
