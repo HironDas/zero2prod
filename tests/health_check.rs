@@ -1,9 +1,11 @@
 //! tests/health_check.rs
 use std::net::{SocketAddr, TcpListener};
 
+use once_cell::sync::Lazy;
 use sqlx::Executor;
 use sqlx::{Connection, PgConnection, PgPool};
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 #[tokio::test]
 async fn health_check_works() {
@@ -85,12 +87,18 @@ async fn subcribe_return_a_400_when_data_is_missing() {
     }
 }
 
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let subscriber = get_subscriber("test".into(), "debug".into());
+    init_subscriber(subscriber);
+});
 struct TestApp {
     address: String,
     db_pool: sqlx::PgPool,
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let address: SocketAddr = listener.local_addr().unwrap();
     let port = address.port();
