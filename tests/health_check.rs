@@ -1,9 +1,12 @@
 //! tests/health_check.rs
 use std::net::{SocketAddr, TcpListener};
 
+use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use sqlx::Executor;
 use sqlx::{Connection, PgConnection, PgPool};
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 #[tokio::test]
 async fn health_check_works() {
@@ -24,9 +27,9 @@ async fn health_check_works() {
 async fn subscribe_return_a_200_for_valid_form_data() {
     let app = spawn_app().await;
     let configuration = get_configuration().expect("Failed to read configuration");
-    let connection_string = configuration.database.connection_string();
+    // let connection_string = configuration.database.connection_string().expose_secret();
 
-    let mut connection = PgConnection::connect(&connection_string)
+    let mut connection = PgConnection::connect(configuration.database.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
 
@@ -85,12 +88,24 @@ async fn subcribe_return_a_400_when_data_is_missing() {
     }
 }
 
+static TRACING: Lazy<()> = Lazy::new(|| {
+    if std::env::var("TEST_LOG").is_ok() {
+        
+        let subscriber = get_subscriber("test".into(), "debug".into(), std::io::stdout);
+        init_subscriber(subscriber);
+    }else{
+        let subscriber = get_subscriber("test".into(), "info".into(), std::io::sink);
+        init_subscriber(subscriber);
+    }
+});
 struct TestApp {
     address: String,
     db_pool: sqlx::PgPool,
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let address: SocketAddr = listener.local_addr().unwrap();
     let port = address.port();
@@ -112,7 +127,7 @@ async fn spawn_app() -> TestApp {
 
 // Test Isolation
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect(&config.connection_string_without_db())
+    let mut connection = PgConnection::connect(&config.connection_string_without_db().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
 
@@ -121,7 +136,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to create database");
 
-    let connection_pool = sqlx::PgPool::connect(&config.connection_string())
+    let connection_pool = sqlx::PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
 
