@@ -29,9 +29,10 @@ async fn subscribe_return_a_200_for_valid_form_data() {
     let configuration = get_configuration().expect("Failed to read configuration");
     // let connection_string = configuration.database.connection_string().expose_secret();
 
-    let mut connection = PgConnection::connect(configuration.database.connection_string().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres");
+    let mut connection =
+        PgConnection::connect(configuration.database.connection_string().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres");
 
     let client = reqwest::Client::new();
     // Act
@@ -90,10 +91,9 @@ async fn subcribe_return_a_400_when_data_is_missing() {
 
 static TRACING: Lazy<()> = Lazy::new(|| {
     if std::env::var("TEST_LOG").is_ok() {
-        
         let subscriber = get_subscriber("test".into(), "debug".into(), std::io::stdout);
         init_subscriber(subscriber);
-    }else{
+    } else {
         let subscriber = get_subscriber("test".into(), "info".into(), std::io::sink);
         init_subscriber(subscriber);
     }
@@ -127,9 +127,10 @@ async fn spawn_app() -> TestApp {
 
 // Test Isolation
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect(&config.connection_string_without_db().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres");
+    let mut connection =
+        PgConnection::connect(&config.connection_string_without_db().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres");
 
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())

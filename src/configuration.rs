@@ -1,11 +1,10 @@
-use secrecy::SecretString;
 use secrecy::ExposeSecret;
-
+use secrecy::SecretString;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
-    pub application_port: u16,
+    pub application: ApplicationSettings,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -18,24 +17,77 @@ pub struct DatabaseSettings {
 }
 
 impl DatabaseSettings {
-    pub fn connection_string(&self) -> SecretString{
+    pub fn connection_string(&self) -> SecretString {
         SecretString::from(format!(
             "postgres://{}:{}@{}:{}/{}",
-            self.username, self.password.expose_secret(), self.host, self.port, self.database_name
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port,
+            self.database_name
         ))
     }
 
-    pub fn connection_string_without_db(&self) -> SecretString{
+    pub fn connection_string_without_db(&self) -> SecretString {
         SecretString::from(format!(
             "postgres://{}:{}@{}:{}",
-            self.username, self.password.expose_secret(), self.host, self.port
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port
         ))
     }
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct ApplicationSettings {
+    pub port: u16,
+    pub host: String,
+}
+
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    let base_path = std::env::current_dir().expect("Failed to get current directory");
+    let config_directory = base_path.join("configuration");
+
     let settings = config::Config::builder()
-        .add_source(config::File::with_name("configuration"))
-        .build()?;
-    settings.try_deserialize::<Settings>()
+        .add_source(config::File::with_name(config_directory.join("base").to_str().unwrap()).required(true));
+
+    let environment: Environment = std::env::var("APP_ENVIRONMENT")
+        .unwrap_or_else(|_| "local".to_string())
+        .try_into()
+        .expect("Failed to parse APP_ENVIRONMENT");
+
+    let settings = settings.add_source(
+        config::File::with_name(config_directory.join(environment.as_str()).to_str().unwrap())
+            .required(true),
+    );
+    
+    settings.build()?.try_deserialize::<Settings>()
+}
+
+
+pub enum Environment{
+    Local,
+    Production,
+}
+
+impl Environment{
+    pub fn as_str(&self)-> &'static str {
+        match self {
+            Environment::Local => "local",
+            Environment::Production => "production",
+        }
+    }
+}
+
+impl TryFrom<String> for Environment{
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "local" => Ok(Environment::Local),
+            "production" => Ok(Environment::Production),
+            other => Err(format!("{} is not a valid environment. Use either `local` or `production`", other)),
+        }
+    }
 }
