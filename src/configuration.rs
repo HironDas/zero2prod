@@ -49,8 +49,9 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     let base_path = std::env::current_dir().expect("Failed to get current directory");
     let config_directory = base_path.join("configuration");
 
-    let settings = config::Config::builder()
-        .add_source(config::File::with_name(config_directory.join("base").to_str().unwrap()).required(true));
+    let settings = config::Config::builder().add_source(
+        config::File::with_name(config_directory.join("base").to_str().unwrap()).required(true),
+    );
 
     let environment: Environment = std::env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| "local".to_string())
@@ -58,21 +59,25 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .expect("Failed to parse APP_ENVIRONMENT");
 
     let settings = settings.add_source(
-        config::File::with_name(config_directory.join(environment.as_str()).to_str().unwrap())
-            .required(true),
+        config::File::with_name(
+            config_directory
+                .join(environment.as_str())
+                .to_str()
+                .unwrap(),
+        )
+        .required(true),
     );
-    
+
     settings.build()?.try_deserialize::<Settings>()
 }
 
-
-pub enum Environment{
+pub enum Environment {
     Local,
     Production,
 }
 
-impl Environment{
-    pub fn as_str(&self)-> &'static str {
+impl Environment {
+    pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Local => "local",
             Environment::Production => "production",
@@ -80,14 +85,17 @@ impl Environment{
     }
 }
 
-impl TryFrom<String> for Environment{
+impl TryFrom<String> for Environment {
     type Error = String;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_lowercase().as_str() {
             "local" => Ok(Environment::Local),
             "production" => Ok(Environment::Production),
-            other => Err(format!("{} is not a valid environment. Use either `local` or `production`", other)),
+            other => Err(format!(
+                "{} is not a valid environment. Use either `local` or `production`",
+                other
+            )),
         }
     }
 }
