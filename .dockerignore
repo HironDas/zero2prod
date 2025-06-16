@@ -1,0 +1,9 @@
+.env
+target/
+tests/
+Dockerfile
+docker-compose.yml
+.git
+.gitignore
+scripts/
+migrations/

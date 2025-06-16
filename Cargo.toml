@@ -11,10 +11,36 @@ path = "src/lib.rs"
 path = "src/main.rs"
 name = "zero2prod"
 
+[profile.release]
+lto = true
+panic = "abort"
+opt-level = "z"
+
 [dependencies]
 actix-web = "4.11.0"
+chrono = "0.4.41"
+config = "0.15.11"
+once_cell = "1.21.3"
+secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread"] }
+tracing = { version = "0.1.41", features = ["log"] }
+tracing-actix-web = "0.7.18"
+tracing-bunyan-formatter = "0.3.10"
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+uuid = { version = "1.17.0", features = ["v4"] }
 
+[dependencies.sqlx]
+version = "0.8.6"
+default-features = false
+features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "migrate",
+    "macros",
+]
 [dev-dependencies]
 reqwest = "0.12.19"
