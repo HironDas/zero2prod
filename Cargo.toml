@@ -11,6 +11,11 @@ path = "src/lib.rs"
 path = "src/main.rs"
 name = "zero2prod"
 
+[profile.release]
+lto = true
+panic = "abort"
+opt-level = "z"
+
 [dependencies]
 actix-web = "4.11.0"
 chrono = "0.4.41"
