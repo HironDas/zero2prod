@@ -98,7 +98,7 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     );
 
     let settings = settings.add_source(
-        config::Environment::with_prefix("app")
+        config::Environment::with_prefix("APP")
             .separator("__"),
     );
 
