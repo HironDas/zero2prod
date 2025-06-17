@@ -1,5 +1,9 @@
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
+use serde_aux::field_attributes::deserialize_number_from_string;
+use sqlx::postgres::PgConnectOptions;
+use sqlx::postgres::PgSslMode;
+use sqlx::ConnectOptions;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct Settings {
@@ -12,11 +16,14 @@ pub struct DatabaseSettings {
     pub username: String,
     pub password: SecretString,
     pub host: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub database_name: String,
+    pub require_ssl: bool,
 }
 
 impl DatabaseSettings {
+    #[allow(dead_code)]
     pub fn connection_string(&self) -> SecretString {
         SecretString::from(format!(
             "postgres://{}:{}@{}:{}/{}",
@@ -28,6 +35,7 @@ impl DatabaseSettings {
         ))
     }
 
+    #[allow(dead_code)]
     pub fn connection_string_without_db(&self) -> SecretString {
         SecretString::from(format!(
             "postgres://{}:{}@{}:{}",
@@ -37,10 +45,31 @@ impl DatabaseSettings {
             self.port
         ))
     }
+
+    pub fn without_db(&self)->PgConnectOptions {
+        PgConnectOptions::new()
+            .host(&self.host)
+            .port(self.port)
+            .username(&self.username)
+            .password(self.password.expose_secret())
+            .ssl_mode(match self.require_ssl {
+                true => PgSslMode::Require,
+                false => PgSslMode::Prefer,
+            })
+    }
+
+    pub fn with_db(&self) -> PgConnectOptions {
+        let options = self
+            .without_db()
+            .database(&self.database_name)
+            .log_statements(tracing::log::LevelFilter::Trace);
+        options
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct ApplicationSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
@@ -66,6 +95,11 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
                 .unwrap(),
         )
         .required(true),
+    );
+
+    let settings = settings.add_source(
+        config::Environment::with_prefix("app")
+            .separator("__"),
     );
 
     settings.build()?.try_deserialize::<Settings>()
