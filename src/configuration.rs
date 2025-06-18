@@ -46,11 +46,11 @@ impl DatabaseSettings {
         ))
     }
 
-    pub fn without_db(&self)->PgConnectOptions {
+    pub fn without_db(&self) -> PgConnectOptions {
         let ssl_mode = match self.require_ssl {
-                true => PgSslMode::Require,
-                false => PgSslMode::Prefer,
-            };
+            true => PgSslMode::Require,
+            false => PgSslMode::Prefer,
+        };
 
         PgConnectOptions::new()
             .host(&self.host)
