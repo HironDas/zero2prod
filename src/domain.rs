@@ -1,0 +1,1 @@
+pub struct SubscriberName<'a>(pub &'a str);
