@@ -51,6 +51,7 @@ impl DatabaseSettings {
                 true => PgSslMode::Require,
                 false => PgSslMode::Prefer,
             };
+
         PgConnectOptions::new()
             .host(&self.host)
             .port(self.port)
@@ -99,7 +100,8 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     );
 
     let settings = settings.add_source(
-        config::Environment::with_prefix("app")
+        config::Environment::with_prefix("APP")
+            .prefix_separator("_")
             .separator("__"),
     );
 
