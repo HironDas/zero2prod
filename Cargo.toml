@@ -30,6 +30,7 @@ tracing-actix-web = "0.7.18"
 tracing-bunyan-formatter = "0.3.10"
 tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+unicode-segmentation = "1.12.0"
 uuid = { version = "1.17.0", features = ["v4"] }
 
 [dependencies.sqlx]
