@@ -4,10 +4,12 @@ pub struct NewSubscriber{
     pub name: SubscriberName,
     pub email: String,
 }
+
+#[derive(Debug)]
 pub struct SubscriberName(String);
 
 impl SubscriberName{
-    pub fn parse(s:String) -> Self{
+    pub fn parse(s:String) -> Result<Self, String>{
         let is_empty_or_whitespace = s.trim().is_empty();
         let is_too_long = s.graphemes(true).count() > 256;
 
@@ -15,10 +17,10 @@ impl SubscriberName{
         let contains_forbidden_characters = s.chars().any(|g| forbidden_characters.contains(&g));
 
         if is_empty_or_whitespace || is_too_long || contains_forbidden_characters {
-            panic!("Invalid subscriber name: {}", s);
+            return Err(format!("Invalid subscriber name: {}", s));
         }
 
-        SubscriberName(s)
+        Ok(SubscriberName(s))
     }
 
 }
@@ -27,4 +29,48 @@ impl AsRef<str> for SubscriberName {
     fn as_ref(&self) -> &str {
         &self.0
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use claim::{assert_err, assert_ok};
+
+    use super::*;
+
+    #[test]
+    fn a_256_grapheme_long_name_is_valid(){
+        let name = "a".repeat(256);
+
+        assert_ok!(SubscriberName::parse(name));
+    }
+
+    #[test]
+    fn a_name_longer_than_256_graphemes_is_rejected(){
+        let name = "a".repeat(257);
+
+        assert_err!(SubscriberName::parse(name));
+    }
+
+    #[test]
+    fn empty_name_is_rejected() {
+        let name = String::new();
+
+        assert_err!(SubscriberName::parse(name));
+    }   
+
+    #[test]
+    fn name_containing_an_invalid_character_are_rejected() {
+        for name in &['/', '(', ')', '"', '<', '>', '\\', '{', '}'] {
+            let name = name.to_string();
+            assert_err!(SubscriberName::parse(name));
+        }   
+    }
+
+    #[test]
+    fn a_valid_name_is_parsed_successfully() {
+        let name = "John Doe".to_string();
+
+        assert_ok!(SubscriberName::parse(name));
+    }   
+
 }
