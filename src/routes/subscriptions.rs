@@ -2,7 +2,6 @@ use crate::domain::{NewSubscriber, SubscriberName};
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use sqlx::PgPool;
-use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -21,14 +20,21 @@ pub struct FromData {
 )]
 pub async fn subscribe(form: web::Form<FromData>, pool: web::Data<PgPool>) -> HttpResponse {
     // let subscriber_name = SubscriberName(&form.name);
+    let name = match SubscriberName::parse(form.0.name) {
+        Ok(name) => name,
+        Err(e) => {
+            tracing::error!("Invalid subscriber name: {}", e);
+            return HttpResponse::BadRequest().finish();
+        }
+    };
 
     let new_subscriber = NewSubscriber {
-        name: SubscriberName::parse(form.0.name).expect("Name validaton failed"),
+        name,
         email: form.0.email,
     };
     match insert_subscriber(&pool, &new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
-        Err(e) => HttpResponse::InternalServerError().finish(),
+        Err(_e) => HttpResponse::InternalServerError().finish(),
     }
 }
 
