@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use sqlx::Executor;
 use sqlx::{Connection, PgConnection, PgPool};
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::email_client::EmailClient;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 #[tokio::test]
@@ -143,8 +144,12 @@ async fn spawn_app() -> TestApp {
     let mut configuration = get_configuration().expect("Failed to read configuration");
     configuration.database.database_name = format!("zero2prod_test_{}", port);
     let connection_pool = configure_database(&configuration.database).await;
+    // Build a new email client
+    let sender_email = configuration.email_client.sender().expect("Invalid Sender emai address");
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+
     let server =
-        zero2prod::startup::run(listener, connection_pool.clone()).expect("Failed to bind address");
+        zero2prod::startup::run(listener, connection_pool.clone(), email_client).expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
     let address = format!("http://127.0.0.1:{}", port);

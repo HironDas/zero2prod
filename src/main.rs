@@ -3,6 +3,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::net::TcpListener;
 use zero2prod::{
     configuration::get_configuration,
+    email_client::EmailClient,
     startup::run,
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -25,6 +26,11 @@ async fn main() -> std::io::Result<()> {
         .acquire_timeout(std::time::Duration::from_secs(2))
         .connect_lazy_with(configuration.database.with_db());
     // .expect("Failed to connect to Postgres");
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
 
     let address = format!(
         "{}:{}",
@@ -33,5 +39,5 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
     // Bubble up the io::Error if we failed to bind the address
     // Otherwise call .await on our Server
-    run(listener, db_pool.clone())?.await
+    run(listener, db_pool.clone(), email_client)?.await
 }

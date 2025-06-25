@@ -5,10 +5,26 @@ use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgSslMode;
 use sqlx::ConnectOptions;
 
+use crate::domain::SubscriberEmail;
+use crate::email_client::EmailClient;
+
 #[derive(Debug, serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub email_client: EmailClientSetting
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct EmailClientSetting{
+    pub base_url: String,
+    pub sender_email: String
+}
+
+impl EmailClientSetting{
+    pub fn sender(&self)-> Result<SubscriberEmail, String> {
+        SubscriberEmail::parse(self.sender_email.clone())
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
