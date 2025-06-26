@@ -28,3 +28,13 @@ impl EmailClient {
         todo!("Implement email sending logic here");
     }
 }
+
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+   #[tokio::test]
+   async fn send_email_fires_a_request_to_base_url(){
+    todo!("Implement a test that sends an email and checks the request to the base URL");
+   }
+}
