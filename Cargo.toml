@@ -51,3 +51,5 @@ claim = "0.5.0"
 fake = "4.3.0"
 proptest = "1.7.0"
 rand = "0.9.1"
+tokio = { version = "1.45.1", features = ["rt", "macros"] }
+wiremock = "0.6.4"
