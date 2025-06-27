@@ -1,20 +1,21 @@
 use std::ops::Sub;
 
-use reqwest::Client;
+use lettre::{message::{header::ContentType, Mailbox}, Address, Message, SmtpTransport, Transport};
+//use reqwest::Client;
 
 use crate::domain::SubscriberEmail;
 
 pub struct EmailClient {
-    http_client: reqwest::Client,
-    base_url: String,
+    smtp_client: SmtpTransport,
+    // base_url: String,
     sender: SubscriberEmail,
 }
 
 impl EmailClient {
     pub fn new(base_url: String, sender: SubscriberEmail) -> Self {
         Self {
-            http_client: Client::new(),
-            base_url,
+            smtp_client: SmtpTransport::builder_dangerous(base_url).build(),
+           // base_url,
             sender,
         }
     }
@@ -25,7 +26,22 @@ impl EmailClient {
         html_content: &str,
         text_content: &str,
     ) -> Result<(), String> {
-        Ok(())
+        let email = Message::builder()
+            .from(Mailbox::new(
+                Some("Hiron Das".to_string()),
+                self.sender.as_ref().parse::<Address>().unwrap(),
+            )).to(Mailbox { name: None, email: recipient.as_ref().parse::<Address>().unwrap() })
+            .subject(subject)
+            .header(ContentType::TEXT_PLAIN)
+            .body(text_content.to_string())
+            .unwrap();
+
+        //let mailer = SmtpTransport::builder_dangerous("localhost:1025".to_string()).build();
+
+        match self.smtp_client.send(&email){
+            Ok(_)=> Ok(()),
+            Err(e)=> Err(format!("Fail to send Email: {:?}", e))
+        }
     }
 }
 
@@ -43,7 +59,7 @@ mod tests {
     use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
 
     use super::*;
-    
+
     #[tokio::test]
     async fn send_email_fires_a_request_to_base_url() {
         let mock_server = MockServer::start().await;
