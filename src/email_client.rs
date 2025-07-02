@@ -1,6 +1,8 @@
-use std::ops::Sub;
-
-use lettre::{message::{header::ContentType, Mailbox}, Address, Message, SmtpTransport, Transport};
+use lettre::{
+    message::{header::ContentType, Mailbox, SinglePart, MultiPart},
+    transport::smtp::{authentication::{Credentials, Mechanism}, client::Tls},
+    Address, Message, SmtpTransport, Transport,
+};
 //use reqwest::Client;
 
 use crate::domain::SubscriberEmail;
@@ -12,10 +14,21 @@ pub struct EmailClient {
 }
 
 impl EmailClient {
-    pub fn new(base_url: String, sender: SubscriberEmail) -> Self {
+    pub fn new(host: String, port: u16, sender: SubscriberEmail) -> Self {
+        let credentials = Credentials::new(
+            String::from("no-reply@domain.tld"),
+            String::from("any_password"),
+        );
+        
         Self {
-            smtp_client: SmtpTransport::builder_dangerous(base_url).build(),
-           // base_url,
+            smtp_client: SmtpTransport::relay(host.as_str())
+                .unwrap()
+                .port(port)
+                .tls(Tls::None)
+                .credentials(credentials)
+                .authentication(vec![Mechanism::Plain])
+                .build(),
+            // base_url,
             sender,
         }
     }
@@ -30,17 +43,33 @@ impl EmailClient {
             .from(Mailbox::new(
                 Some("Hiron Das".to_string()),
                 self.sender.as_ref().parse::<Address>().unwrap(),
-            )).to(Mailbox { name: None, email: recipient.as_ref().parse::<Address>().unwrap() })
+            ))
+            .to(Mailbox {
+                name: None,
+                email: recipient.as_ref().parse::<Address>().unwrap(),
+            })
             .subject(subject)
             .header(ContentType::TEXT_PLAIN)
-            .body(text_content.to_string())
+            .multipart(
+                MultiPart::alternative()
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(ContentType::TEXT_PLAIN)
+                            .body(text_content.to_string()),
+                    )
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(ContentType::TEXT_HTML)
+                            .body(html_content.to_string()),
+                    ),
+            )
             .unwrap();
 
         //let mailer = SmtpTransport::builder_dangerous("localhost:1025".to_string()).build();
 
-        match self.smtp_client.send(&email){
-            Ok(_)=> Ok(()),
-            Err(e)=> Err(format!("Fail to send Email: {:?}", e))
+        match self.smtp_client.send(&email) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("Fail to send Email: {:?}", e)),
         }
     }
 }
@@ -56,21 +85,25 @@ mod tests {
         locales::EN,
         Fake,
     };
-    use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
+    use maik::MockServer;
+    //  use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
 
     use super::*;
 
     #[tokio::test]
     async fn send_email_fires_a_request_to_base_url() {
-        let mock_server = MockServer::start().await;
+        let mock_server = MockServer::builder().no_verify_credentials().build(); //MockServer::start().await;
         let sender = SubscriberEmail::parse(SafeEmail(EN).fake()).unwrap();
-        let email_client = EmailClient::new(mock_server.uri(), sender);
+        mock_server.start();
 
-        Mock::given(any())
-            .respond_with(ResponseTemplate::new(200))
-            .expect(1)
-            .mount(&mock_server)
-            .await;
+        let email_client =
+            EmailClient::new(mock_server.host().to_string(), mock_server.port(), sender);
+
+        // Mock::given(any())
+        //     .respond_with(ResponseTemplate::new(200))
+        //     .expect(1)
+        //     .mount(&mock_server)
+        //     .await;
 
         let subscriber_email = SubscriberEmail::parse(SafeEmail(EN).fake()).unwrap();
 

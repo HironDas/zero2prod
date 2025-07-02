@@ -146,7 +146,7 @@ async fn spawn_app() -> TestApp {
     let connection_pool = configure_database(&configuration.database).await;
     // Build a new email client
     let sender_email = configuration.email_client.sender().expect("Invalid Sender emai address");
-    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
+    let email_client = EmailClient::new(configuration.email_client.host, configuration.email_client.port, sender_email);
 
     let server =
         zero2prod::startup::run(listener, connection_pool.clone(), email_client).expect("Failed to bind address");
