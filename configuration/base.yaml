@@ -9,4 +9,4 @@ database:
 email_client:
   host: "localhost"
   port: 1025
-  sender_email: "test@gmail.com"
+  sender_email: "no-reply@zero2prod.com"
