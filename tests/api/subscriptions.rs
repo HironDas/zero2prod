@@ -1,27 +1,5 @@
-//! tests/health_check.rs
-use std::net::{SocketAddr, TcpListener};
+use crate::helpers::spawn_app;
 
-use once_cell::sync::Lazy;
-use sqlx::Executor;
-use sqlx::{Connection, PgConnection, PgPool};
-use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::email_client::EmailClient;
-use zero2prod::telemetry::{get_subscriber, init_subscriber};
-
-#[tokio::test]
-async fn health_check_works() {
-    let app = spawn_app().await;
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(&format!("{}/health_check", &app.address))
-        .send()
-        .await
-        .expect("Failed to execute request.");
-
-    assert!(response.status().is_success());
-    assert_eq!(Some(0), response.content_length());
-}
 
 #[tokio::test]
 async fn subscribe_return_a_200_for_valid_form_data() {
@@ -97,7 +75,10 @@ async fn subscribe_return_a_400_when_fields_are_present_but_empty() {
     let test_cases = vec![
         ("name=&email=hcdas.09%40gmail.com", "empty name"),
         ("name=Hiron%20Das&email=", "empty email"),
-        ("name=&email=definately-not-an-email", "empty name and email"),
+        (
+            "name=&email=definately-not-an-email",
+            "empty name and email",
+        ),
     ];
 
     for (body, description) in test_cases {
@@ -119,66 +100,35 @@ async fn subscribe_return_a_400_when_fields_are_present_but_empty() {
     }
 }
 
-static TRACING: Lazy<()> = Lazy::new(|| {
-    if std::env::var("TEST_LOG").is_ok() {
-        let subscriber = get_subscriber("test".into(), "debug".into(), std::io::stdout);
-        init_subscriber(subscriber);
-    } else {
-        let subscriber = get_subscriber("test".into(), "info".into(), std::io::sink);
-        init_subscriber(subscriber);
-    }
-});
-struct TestApp {
-    address: String,
-    db_pool: sqlx::PgPool,
-}
+#[tokio::test]
+async fn test_email_contents() {
+    let app = spawn_app().await;
 
-async fn spawn_app() -> TestApp {
-    Lazy::force(&TRACING);
+    let client = reqwest::Client::new();
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let address: SocketAddr = listener.local_addr().unwrap();
-    let port = address.port();
-    // println!("Listening on {:#?}", address.to_string());
+    let mailhog_api_url = "http://localhost:8025/api/v1";
 
-    let mut configuration = get_configuration().expect("Failed to read configuration");
-    configuration.database.database_name = format!("zero2prod_test_{}", port);
-    let connection_pool = configure_database(&configuration.database).await;
-    // Build a new email client
-    let sender_email = configuration.email_client.sender().expect("Invalid Sender emai address");
-    let email_client = EmailClient::new(configuration.email_client.host, configuration.email_client.port, sender_email);
-
-    let server =
-        zero2prod::startup::run(listener, connection_pool.clone(), email_client).expect("Failed to bind address");
-    let _ = tokio::spawn(server);
-
-    let address = format!("http://127.0.0.1:{}", port);
-
-    TestApp {
-        address,
-        db_pool: connection_pool,
-    }
-}
-
-// Test Isolation
-pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect_with(&config.without_db())
+    // Delete All OLD Emails
+    client.delete(&format!("{}/messages", mailhog_api_url))
+        .send()
         .await
-        .expect("Failed to connect to Postgres");
+        .expect("Failed to delete old emails.");
 
-    connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+    let response = client
+        .post(&format!("{}/subscriptions", &app.address))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body("name=Hiron%20Das&email=hcdas.09%40gmail.com")
+        .send()
         .await
-        .expect("Failed to create database");
+        .expect("Failed to execute request.");
 
-    let connection_pool = sqlx::PgPool::connect_with(config.with_db())
-        .await
-        .expect("Failed to connect to Postgres");
+    assert_eq!(200, response.status().as_u16());
 
-    sqlx::migrate!("./migrations")
-        .run(&connection_pool)
-        .await
-        .expect("Failed to run migrations");
+    let response = client.get(format!("{}/messages", mailhog_api_url)).send().await
+        .expect("Failed to fetch emails from mail server.");
 
-    connection_pool
+    // let emails = response.json().await
+    //     .expect("Failed to parse emails from response.");
+
+    assert_eq!(200, response.status().as_u16());
 }
