@@ -1,12 +1,10 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-
-
 #[derive(Debug)]
 pub struct SubscriberName(String);
 
-impl SubscriberName{
-    pub fn parse(s:String) -> Result<Self, String>{
+impl SubscriberName {
+    pub fn parse(s: String) -> Result<Self, String> {
         let is_empty_or_whitespace = s.trim().is_empty();
         let is_too_long = s.graphemes(true).count() > 256;
 
@@ -19,7 +17,6 @@ impl SubscriberName{
 
         Ok(SubscriberName(s))
     }
-
 }
 
 impl AsRef<str> for SubscriberName {
@@ -35,14 +32,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_256_grapheme_long_name_is_valid(){
+    fn a_256_grapheme_long_name_is_valid() {
         let name = "a".repeat(256);
 
         assert_ok!(SubscriberName::parse(name));
     }
 
     #[test]
-    fn a_name_longer_than_256_graphemes_is_rejected(){
+    fn a_name_longer_than_256_graphemes_is_rejected() {
         let name = "a".repeat(257);
 
         assert_err!(SubscriberName::parse(name));
@@ -53,14 +50,14 @@ mod tests {
         let name = String::new();
 
         assert_err!(SubscriberName::parse(name));
-    }   
+    }
 
     #[test]
     fn name_containing_an_invalid_character_are_rejected() {
         for name in &['/', '(', ')', '"', '<', '>', '\\', '{', '}'] {
             let name = name.to_string();
             assert_err!(SubscriberName::parse(name));
-        }   
+        }
     }
 
     #[test]
@@ -68,6 +65,5 @@ mod tests {
         let name = "John Doe".to_string();
 
         assert_ok!(SubscriberName::parse(name));
-    }   
-
+    }
 }
