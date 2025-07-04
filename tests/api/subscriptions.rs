@@ -1,5 +1,6 @@
-use crate::helpers::spawn_app;
+use fake::{faker::internet::en::SafeEmail, Fake};
 
+use crate::helpers::spawn_app;
 
 #[tokio::test]
 async fn subscribe_return_a_200_for_valid_form_data() {
@@ -109,7 +110,8 @@ async fn test_email_contents() {
     let mailhog_api_url = "http://localhost:8025/api/v1";
 
     // Delete All OLD Emails
-    client.delete(&format!("{}/messages", mailhog_api_url))
+    client
+        .delete(&format!("{}/messages", mailhog_api_url))
         .send()
         .await
         .expect("Failed to delete old emails.");
@@ -117,14 +119,17 @@ async fn test_email_contents() {
     let response = client
         .post(&format!("{}/subscriptions", &app.address))
         .header("Content-Type", "application/x-www-form-urlencoded")
-        .body("name=Hiron%20Das&email=hcdas.09%40gmail.com")
+        .body(format!("name=Hiron%20Das&email={}", SafeEmail().fake::<String>()))
         .send()
         .await
         .expect("Failed to execute request.");
 
     assert_eq!(200, response.status().as_u16());
 
-    let response = client.get(format!("{}/messages", mailhog_api_url)).send().await
+    let response = client
+        .get(format!("{}/messages", mailhog_api_url))
+        .send()
+        .await
         .expect("Failed to fetch emails from mail server.");
 
     // let emails = response.json().await

@@ -40,13 +40,13 @@ mod tests {
 
     // prop_compose! {
     //     fn valid_email()
-    //     (mut rng in any::<u64>().prop_map(|seed| StdRng::seed_from_u64(seed))) 
+    //     (mut rng in any::<u64>().prop_map(|seed| StdRng::seed_from_u64(seed)))
     //     (email in SafeEmail(EN).fake_with_rng(&mut rng)) -> SubscriberEmailFixture {
     //         SubscriberEmailFixture(email)
     //     }
     // }
 
-    fn safe_email_strategy()-> impl Strategy<Value = SubscriberEmailFixture> {
+    fn safe_email_strategy() -> impl Strategy<Value = SubscriberEmailFixture> {
         any::<u64>().prop_map(|seed| {
             let mut rng = StdRng::seed_from_u64(seed);
             let email = SafeEmail(EN).fake_with_rng(&mut rng);

@@ -7,28 +7,28 @@ use sqlx::ConnectOptions;
 
 use crate::domain::SubscriberEmail;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
-    pub email_client: EmailClientSetting
+    pub email_client: EmailClientSetting,
 }
 
-#[derive(Debug, serde::Deserialize)]
-pub struct EmailClientSetting{
+#[derive(Debug, serde::Deserialize, Clone)]
+pub struct EmailClientSetting {
     pub host: String,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
-    pub sender_email: String
+    pub sender_email: String,
 }
 
-impl EmailClientSetting{
-    pub fn sender(&self)-> Result<SubscriberEmail, String> {
+impl EmailClientSetting {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
         SubscriberEmail::parse(self.sender_email.clone())
     }
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
     pub password: SecretString,
@@ -86,7 +86,7 @@ impl DatabaseSettings {
     }
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
