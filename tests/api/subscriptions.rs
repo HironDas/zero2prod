@@ -13,17 +13,10 @@ async fn subscribe_return_a_200_for_valid_form_data() {
     //         .await
     //         .expect("Failed to connect to Postgres");
 
-    let client = reqwest::Client::new();
     // Act
     let body = "name=Hiron%20Das&email=hcdas.09%40gmail.com";
 
-    let response = client
-        .post(&format!("{}/subscriptions", &app.address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let response = app.post_subscriptions(body.into()).await;
 
     // Assert
     assert_eq!(200, response.status().as_u16());
@@ -41,7 +34,7 @@ async fn subscribe_return_a_200_for_valid_form_data() {
 async fn subcribe_return_a_400_when_data_is_missing() {
     // Arrange
     let app = spawn_app().await;
-    let client = reqwest::Client::new();
+   
     let test_cases = vec![
         ("name=Hiron%20Das", "missing the email"),
         ("email=hcdas.09%40gmail.com", "missing the name"),
@@ -50,13 +43,7 @@ async fn subcribe_return_a_400_when_data_is_missing() {
 
     for (invalid_body, error_message) in test_cases {
         // Act
-        let response = client
-            .post(&format!("{}/subscriptions", &app.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(invalid_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = app.post_subscriptions(invalid_body.into()).await;
 
         // Assert
         assert_eq!(
@@ -72,7 +59,7 @@ async fn subcribe_return_a_400_when_data_is_missing() {
 async fn subscribe_return_a_400_when_fields_are_present_but_empty() {
     // Arrange
     let app = spawn_app().await;
-    let client = reqwest::Client::new();
+    
     let test_cases = vec![
         ("name=&email=hcdas.09%40gmail.com", "empty name"),
         ("name=Hiron%20Das&email=", "empty email"),
@@ -83,14 +70,7 @@ async fn subscribe_return_a_400_when_fields_are_present_but_empty() {
     ];
 
     for (body, description) in test_cases {
-        let response = client
-            .post(&format!("{}/subscriptions", &app.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
-
+        let response = app.post_subscriptions(body.into()).await;
         // Assert
         assert_eq!(
             400,
@@ -115,14 +95,9 @@ async fn test_email_contents() {
         .send()
         .await
         .expect("Failed to delete old emails.");
+    let body = format!("user=Hiron Das&email={}", SafeEmail().fake::<String>());
 
-    let response = client
-        .post(&format!("{}/subscriptions", &app.address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(format!("name=Hiron%20Das&email={}", SafeEmail().fake::<String>()))
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let response = app.post_subscriptions(body.into()).await;
 
     assert_eq!(200, response.status().as_u16());
 
