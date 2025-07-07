@@ -1,4 +1,4 @@
-use fake::{faker::internet::en::SafeEmail, Fake};
+use fake::{faker::internet::raw::SafeEmail, locales, Fake};
 
 use crate::helpers::spawn_app;
 
@@ -95,9 +95,11 @@ async fn test_email_contents() {
         .send()
         .await
         .expect("Failed to delete old emails.");
-    let body = format!("user=Hiron Das&email={}", SafeEmail().fake::<String>());
 
-    let response = app.post_subscriptions(body.into()).await;
+    let fake_email = SafeEmail(locales::EN).fake::<String>();
+    let body = format!("name=Hiron Das&email={}", fake_email);
+    
+    let response = app.post_subscriptions(body).await;
 
     assert_eq!(200, response.status().as_u16());
 
