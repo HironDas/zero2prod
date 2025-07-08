@@ -26,6 +26,8 @@ then
         -e POSTGRES_PASSWORD=${DB_PASSWORD} \
         -e POSTGRES_DB=${DB_NAME} \
         -p "${DB_PORT}":5432 \
+        --restart=always \
+        --name newsletter_postgres \
         -d postgres \
         postgres -N 1000
 fi
