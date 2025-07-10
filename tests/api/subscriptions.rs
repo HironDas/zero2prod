@@ -108,9 +108,26 @@ async fn test_email_contents() {
         .send()
         .await
         .expect("Failed to fetch emails from mail server.");
+    let emails: Vec<serde_json::Value> = response
+        .json()
+        .await
+        .expect("Failed to parse response body as JSON.");
 
-    // let emails = response.json().await
-    //     .expect("Failed to parse emails from response.");
+    //println!("Emails: {:?}", emails);
 
-    assert_eq!(200, response.status().as_u16());
+    let get_link = |s: &str| {
+        let links: Vec<_> = linkify::LinkFinder::new()
+        .links(s)
+        .filter(|l| *l.kind() == linkify::LinkKind::Url)
+        .map(|l| l.as_str().to_string())
+        .collect();
+        assert_eq!(links.len(), 2);
+        links
+    };
+    let msg = emails[0]["Content"]["Body"].as_str().unwrap();
+    let links = get_link(msg);
+    
+    assert_eq!(links[0], links[1]);
+
 }
+    //assert_eq!(200, response.status().as_u16());
