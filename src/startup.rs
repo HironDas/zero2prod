@@ -47,7 +47,7 @@ impl Application {
 
     pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
         self.server.await
-    }   
+    }
 }
 
 pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {

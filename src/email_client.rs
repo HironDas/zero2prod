@@ -30,8 +30,8 @@ impl EmailClient {
         &self,
         recipient: SubscriberEmail,
         subject: &str,
-        html_content: &str,
-        text_content: &str,
+        html_content: impl AsRef<str>,
+        text_content: impl AsRef<str>,
     ) -> Result<(), String> {
         let email = Message::builder()
             .from(Mailbox::new(
@@ -43,18 +43,19 @@ impl EmailClient {
                 email: recipient.as_ref().parse::<Address>().unwrap(),
             })
             .subject(subject)
-            .header(ContentType::TEXT_PLAIN)
+            //.header("Content-Transfer-Encoding", "base64")
+            .header(ContentType::parse("text/plain; charset=utf-8").unwrap())
             .multipart(
                 MultiPart::alternative()
                     .singlepart(
                         SinglePart::builder()
                             .header(ContentType::TEXT_PLAIN)
-                            .body(text_content.to_string()),
+                            .body(text_content.as_ref().to_string()),
                     )
                     .singlepart(
                         SinglePart::builder()
                             .header(ContentType::TEXT_HTML)
-                            .body(html_content.to_string()),
+                            .body(html_content.as_ref().to_string()),
                     ),
             )
             .unwrap();

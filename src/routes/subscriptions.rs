@@ -1,6 +1,6 @@
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::{self, EmailClient},
+    email_client::EmailClient,
 };
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
@@ -50,21 +50,33 @@ pub async fn subscribe(
         return HttpResponse::InternalServerError().finish();
     }
 
-    match email_client
-        .send_email(
-            new_subscriber.email,
-            "Welcome to our newsletter!",
-            "<p> <b>Thank you </b> for subscribing to our newsletter.</p>",
-            "Thank you for subscribing to our newsletter.",
-        )
-        .await
-    {
+    match send_confirmation_email(&email_client, new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             tracing::error!("Failed to send a confirmation email: {}", e);
             HttpResponse::InternalServerError().finish()
         }
     }
+}
+
+#[tracing::instrument(
+    name = "Send a confirmation email to a new subscriber",
+    skip(email_client, new_subscriber)
+)]
+pub async fn send_confirmation_email(
+    email_client: &EmailClient,
+    new_subscriber: NewSubscriber,
+) -> Result<(), String> {
+    let confirmation_link = "http://my-api.com/subscriptions/confirm";
+
+    email_client
+        .send_email(
+            new_subscriber.email,
+            "Welcome to our newsletter!",
+            format!("<p> <b>Thank you </b> for subscribing to our newsletter. <br/> Click to <a href=\"{}\">Confirm your subscription</a> </p>", confirmation_link),
+            format!("Thank you for subscribing to our newsletter.\nClick to confirm your subscription:{}", confirmation_link),
+        )
+        .await
 }
 
 #[tracing::instrument(
@@ -78,7 +90,7 @@ pub async fn insert_subscriber(
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, name, email, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'confirmed')
+        VALUES ($1, $2, $3, $4, 'pending_confirmation')
         "#,
         Uuid::new_v4(),
         new_subscriber.name.as_ref(),
