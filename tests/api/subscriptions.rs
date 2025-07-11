@@ -20,21 +20,34 @@ async fn subscribe_return_a_200_for_valid_form_data() {
 
     // Assert
     assert_eq!(200, response.status().as_u16());
+}
 
-    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = "name=Hiron%20Das&email=hcdas.09%40gmail.com";
+
+    // Act
+    app.post_subscriptions(body.into()).await;
+
+    // Assert
+
+    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions")
         .fetch_one(&app.db_pool)
         .await
         .expect("Failed to fetch saved subscription");
 
     assert_eq!(saved.email, "hcdas.09@gmail.com");
     assert_eq!(saved.name, "Hiron Das");
+    assert_eq!(saved.status, "pending_confirmation");
 }
 
 #[tokio::test]
 async fn subcribe_return_a_400_when_data_is_missing() {
     // Arrange
     let app = spawn_app().await;
-   
+
     let test_cases = vec![
         ("name=Hiron%20Das", "missing the email"),
         ("email=hcdas.09%40gmail.com", "missing the name"),
@@ -59,7 +72,7 @@ async fn subcribe_return_a_400_when_data_is_missing() {
 async fn subscribe_return_a_400_when_fields_are_present_but_empty() {
     // Arrange
     let app = spawn_app().await;
-    
+
     let test_cases = vec![
         ("name=&email=hcdas.09%40gmail.com", "empty name"),
         ("name=Hiron%20Das&email=", "empty email"),
@@ -98,7 +111,7 @@ async fn test_email_contents() {
 
     let fake_email = SafeEmail(locales::EN).fake::<String>();
     let body = format!("name=Hiron Das&email={}", fake_email);
-    
+
     let response = app.post_subscriptions(body).await;
 
     assert_eq!(200, response.status().as_u16());
@@ -117,17 +130,16 @@ async fn test_email_contents() {
 
     let get_link = |s: &str| {
         let links: Vec<_> = linkify::LinkFinder::new()
-        .links(s)
-        .filter(|l| *l.kind() == linkify::LinkKind::Url)
-        .map(|l| l.as_str().to_string())
-        .collect();
+            .links(s)
+            .filter(|l| *l.kind() == linkify::LinkKind::Url)
+            .map(|l| l.as_str().to_string())
+            .collect();
         assert_eq!(links.len(), 2);
         links
     };
     let msg = emails[0]["Content"]["Body"].as_str().unwrap();
     let links = get_link(msg);
-    
-    assert_eq!(links[0], links[1]);
 
+    assert_eq!(links[0], links[1]);
 }
-    //assert_eq!(200, response.status().as_u16());
+//assert_eq!(200, response.status().as_u16());

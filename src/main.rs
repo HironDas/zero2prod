@@ -1,6 +1,8 @@
 //! src/main.rs
 use zero2prod::{
-    configuration::get_configuration, startup::Application, telemetry::{get_subscriber, init_subscriber}
+    configuration::get_configuration,
+    startup::Application,
+    telemetry::{get_subscriber, init_subscriber},
 };
 
 #[tokio::main]
