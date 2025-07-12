@@ -1,6 +1,6 @@
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::EmailClient,
+    email_client::EmailClient, startup::{ApplicationBaseUrl},
 };
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
@@ -25,7 +25,7 @@ impl TryFrom<FromData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, pool, email_client),
+    skip(form, pool, email_client, base_url),
     fields(
         subscriber_email = %form.email,
         subscriber_name = %form.name,
@@ -35,6 +35,7 @@ pub async fn subscribe(
     form: web::Form<FromData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
+    base_url: web::Data<ApplicationBaseUrl>,
 ) -> HttpResponse {
     // let subscriber_name = SubscriberName(&form.name);
 
@@ -50,7 +51,7 @@ pub async fn subscribe(
         return HttpResponse::InternalServerError().finish();
     }
 
-    match send_confirmation_email(&email_client, new_subscriber).await {
+    match send_confirmation_email(&email_client, new_subscriber, &base_url.0).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
             tracing::error!("Failed to send a confirmation email: {}", e);
@@ -61,13 +62,14 @@ pub async fn subscribe(
 
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
-    skip(email_client, new_subscriber)
+    skip(email_client, new_subscriber, base_url)
 )]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: &str
 ) -> Result<(), String> {
-    let confirmation_link = "http://my-api.com/subscriptions/confirm";
+    let confirmation_link = format!("{}/subscriptions/confirm", base_url); //"http://my-api.com/subscriptions/confirm";
 
     email_client
         .send_email(
