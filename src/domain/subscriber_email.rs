@@ -23,7 +23,6 @@ impl AsRef<str> for SubscriberEmail {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claim::{assert_err, assert_ok};
     use fake::{faker::internet::raw::SafeEmail, locales::EN, Fake};
     use proptest::prelude::*;
     use rand::rngs::StdRng;
@@ -32,7 +31,7 @@ mod tests {
     #[test]
     fn valid_emails_are_parsed_successfully() {
         let email = SafeEmail(EN).fake();
-        assert_ok!(SubscriberEmail::parse(email));
+        assert!(SubscriberEmail::parse(email).is_ok());
     }
 
     #[derive(Debug, Clone)]
@@ -57,25 +56,25 @@ mod tests {
     proptest! {
         #[test]
         fn valid_emails_are_parsed_successfully_proptest(email in safe_email_strategy()) {
-            assert_ok!(SubscriberEmail::parse(email.0));
+            assert!(SubscriberEmail::parse(email.0).is_ok());
         }
     }
 
     #[test]
     fn empty_string_is_rejected() {
         let email = "".to_string();
-        assert_err!(SubscriberEmail::parse(email));
+        assert!(SubscriberEmail::parse(email).is_err());
     }
 
     #[test]
     fn email_missing_at_symbol_is_rejected() {
         let email = "testemail.com".to_string();
-        assert_err!(SubscriberEmail::parse(email));
+        assert!(SubscriberEmail::parse(email).is_err());
     }
 
     #[test]
     fn email_missing_subject_is_rejected() {
         let email = "@testemail.com".to_string();
-        assert_err!(SubscriberEmail::parse(email));
+        assert!(SubscriberEmail::parse(email).is_err());
     }
 }

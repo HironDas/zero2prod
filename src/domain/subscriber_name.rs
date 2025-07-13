@@ -27,7 +27,7 @@ impl AsRef<str> for SubscriberName {
 
 #[cfg(test)]
 mod tests {
-    use claim::{assert_err, assert_ok};
+    //use claim::{assert_err, assert_ok};
 
     use super::*;
 
@@ -35,28 +35,28 @@ mod tests {
     fn a_256_grapheme_long_name_is_valid() {
         let name = "a".repeat(256);
 
-        assert_ok!(SubscriberName::parse(name));
+        assert!(SubscriberName::parse(name).is_ok());
     }
 
     #[test]
     fn a_name_longer_than_256_graphemes_is_rejected() {
         let name = "a".repeat(257);
 
-        assert_err!(SubscriberName::parse(name));
+        assert!(SubscriberName::parse(name).is_err());
     }
 
     #[test]
     fn empty_name_is_rejected() {
         let name = String::new();
 
-        assert_err!(SubscriberName::parse(name));
+        assert!(SubscriberName::parse(name).is_err());
     }
 
     #[test]
     fn name_containing_an_invalid_character_are_rejected() {
         for name in &['/', '(', ')', '"', '<', '>', '\\', '{', '}'] {
             let name = name.to_string();
-            assert_err!(SubscriberName::parse(name));
+            assert!(SubscriberName::parse(name).is_err());
         }
     }
 
@@ -64,6 +64,6 @@ mod tests {
     fn a_valid_name_is_parsed_successfully() {
         let name = "John Doe".to_string();
 
-        assert_ok!(SubscriberName::parse(name));
+        assert!(SubscriberName::parse(name).is_ok());
     }
 }
