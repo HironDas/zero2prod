@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use crate::{
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::EmailClient,
@@ -6,7 +8,7 @@ use crate::{
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rand::{distr::Alphanumeric, rng, Rng};
-use sqlx::{PgPool, Transaction};
+use sqlx::{PgPool, Transaction, Postgres};
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -51,12 +53,12 @@ pub async fn subscribe(
 
     let mut transaction = match pool.begin().await{
         Ok(transaction) => transaction,
-        Err(e)=> return HttpResponse::InternalServerError().finish(),
+        Err(_e)=> return HttpResponse::InternalServerError().finish(),
     };
 
-    let subscribtion_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
+    let subscribtion_id = match insert_subscriber( &mut transaction, &new_subscriber).await {
         Ok(subscriber_id) => subscriber_id,
-        Err(e) => {
+        Err(_e) => {
             return HttpResponse::InternalServerError().finish();
         }
     };
@@ -95,19 +97,19 @@ pub async fn subscribe(
     skip(transaction, subscriber_id, token)
 )]
 pub async fn store_token(
-    transaction: &mut Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: &Uuid,
     token: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(
+    sqlx::query(
         r#"
         INSERT INTO subscription_tokens (subscription_id, subscription_token)
         VALUES ($1, $2)
-    "#,
-        subscriber_id,
-        token
+    "#
     )
-    .execute(transaction)
+    .bind(subscriber_id)
+    .bind(token)
+    .execute(transaction.deref_mut())
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
@@ -152,7 +154,7 @@ pub async fn send_confirmation_email(
     skip(new_subscriber, transaction)
 )]
 pub async fn insert_subscriber(
-    transaction: &mut Transaction<'_, sqlx::Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     new_subscriber: &NewSubscriber,
 ) -> Result<Uuid, sqlx::Error> {
     let subscriber_id = Uuid::new_v4();
@@ -166,7 +168,7 @@ pub async fn insert_subscriber(
         new_subscriber.email.as_ref(),
         Utc::now()
     )
-    .execute(transaction)
+    .execute(transaction.deref_mut())
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
