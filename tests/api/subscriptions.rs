@@ -127,3 +127,18 @@ async fn test_email_contents() {
     assert_eq!(links.html.path(), links.plain_text.path());
 }
 //assert_eq!(200, response.status().as_u16());
+
+#[tokio::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error(){
+    let app = spawn_app().await;
+    let body = "name=Hiron%20Das&email=hcdas.09%40gmail.com";
+
+    // Sabotage the database
+    sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;")
+        .execute(&app.db_pool)
+        .await
+        .expect("Failed to sabotage the database");
+
+    let response = app.post_subscriptions(body.into()).await;
+    assert_eq!(500, response.status().as_u16());
+}
