@@ -10,6 +10,7 @@ use crate::{
 };
 use actix_web::{web, HttpResponse, ResponseError};
 use chrono::Utc;
+use lettre::transport::smtp;
 use rand::{distr::Alphanumeric, rng, Rng};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -43,49 +44,126 @@ pub async fn subscribe(
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, SubscribeError> {
     // let subscriber_name = SubscriberName(&form.name);
 
-    let new_subscriber = match form.0.try_into() {
-        Ok(subscriber) => subscriber,
-        Err(e) => {
-            tracing::error!("Failed to parse new subscriber: {}", e);
-            return Ok(HttpResponse::BadRequest().finish());
-        }
-    };
+    let new_subscriber = form.0.try_into()?;
 
-    let mut transaction = match pool.begin().await {
-        Ok(transaction) => transaction,
-        Err(_e) => return Ok(HttpResponse::InternalServerError().finish()),
-    };
+    let mut transaction = pool.begin().await.map_err(SubscribeError::PoolError)?;
 
-    let subscribtion_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
-        Err(_e) => {
-            return Ok(HttpResponse::InternalServerError().finish());
-        }
-    };
+    let subscribtion_id = insert_subscriber(&mut transaction, &new_subscriber)
+        .await
+        .map_err(SubscribeError::InsertSubscriberError)?;
 
     let subscription_token = generate_subscription_token();
 
     store_token(&mut transaction, &subscribtion_id, &subscription_token).await?;
 
-    if transaction.commit().await.is_err() {
-        return Ok(HttpResponse::InternalServerError().finish());
-    }
+    transaction
+        .commit()
+        .await
+        .map_err(SubscribeError::TransactionCommitError)?;
 
-    match send_confirmation_email(
+    send_confirmation_email(
         &email_client,
         new_subscriber,
         &base_url.0,
         &subscription_token,
     )
-    .await
-    {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(e) => {
-            tracing::error!("Failed to send a confirmation email: {}", e);
-            Ok(HttpResponse::InternalServerError().finish())
+    .await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+pub enum SubscribeError {
+    ValidationError(String),
+    // DatabaseError(sqlx::Error),
+    StoreTokenError(StoreTokenError),
+    SendEmailError(smtp::Error),
+    PoolError(sqlx::Error),
+    InsertSubscriberError(sqlx::Error),
+    TransactionCommitError(sqlx::Error),
+}
+
+impl From<smtp::Error> for SubscribeError {
+    fn from(error: smtp::Error) -> Self {
+        SubscribeError::SendEmailError(error)
+    }
+}
+
+// impl From<sqlx::Error> for SubscribeError {
+//     fn from(error: sqlx::Error) -> Self {
+//         SubscribeError::DatabaseError(error)
+//     }
+// }
+
+impl From<String> for SubscribeError {
+    fn from(error: String) -> Self {
+        SubscribeError::ValidationError(error)
+    }
+}
+
+impl From<StoreTokenError> for SubscribeError {
+    fn from(error: StoreTokenError) -> Self {
+        SubscribeError::StoreTokenError(error)
+    }
+}
+
+impl Debug for SubscribeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl Display for SubscribeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SubscribeError::ValidationError(e) => write!(f, "Validation error: {}", e),
+            // SubscribeError::DatabaseError(e) => write!(f, "Database error: {}", e),
+            SubscribeError::StoreTokenError(_e) => write!(
+                f,
+                "Failed to store the confirmation token for a new subscriber."
+            ),
+            SubscribeError::SendEmailError(_e) => {
+                write!(f, "Failed to send a confitrmation email.")
+            }
+            SubscribeError::PoolError(_) => write!(f, "Failed to get a connection from the pool."),
+            SubscribeError::InsertSubscriberError(_e) => {
+                write!(f, "Failed to insert a new subscriber into the database.")
+            }
+            SubscribeError::TransactionCommitError(_e) => {
+                write!(f, "Failed to commit the transaction.")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SubscribeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            SubscribeError::ValidationError(_) => None,
+            // SubscribeError::DatabaseError(e) => Some(e),
+            SubscribeError::StoreTokenError(e) => Some(e),
+            SubscribeError::SendEmailError(e) => Some(e),
+            SubscribeError::PoolError(e)
+            | SubscribeError::InsertSubscriberError(e)
+            | SubscribeError::TransactionCommitError(e) => Some(e),
+        }
+    }
+}
+
+impl ResponseError for SubscribeError {
+    fn status_code(&self) -> actix_web::http::StatusCode {
+        match self {
+            SubscribeError::ValidationError(_) => actix_web::http::StatusCode::BAD_REQUEST,
+            // SubscribeError::DatabaseError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            SubscribeError::StoreTokenError(_)
+            | SubscribeError::SendEmailError(_)
+            | SubscribeError::PoolError(_)
+            | SubscribeError::InsertSubscriberError(_)
+            | SubscribeError::TransactionCommitError(_) => {
+                actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+            }
         }
     }
 }
@@ -118,7 +196,7 @@ pub async fn store_token(
 
 pub struct StoreTokenError(sqlx::Error);
 
-impl ResponseError for StoreTokenError {}
+// impl ResponseError for StoreTokenError {}
 impl std::error::Error for StoreTokenError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&self.0)
@@ -150,7 +228,7 @@ pub async fn send_confirmation_email(
     new_subscriber: NewSubscriber,
     base_url: &str,
     subscriber_token: &str,
-) -> Result<(), String> {
+) -> Result<(), smtp::Error> {
     let confirmation_link = format!(
         "{}/subscriptions/confirm?subscription_token={}",
         base_url, subscriber_token

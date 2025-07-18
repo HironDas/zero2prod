@@ -1,6 +1,6 @@
 use lettre::{
     message::{header::ContentType, Mailbox, MultiPart, SinglePart},
-    transport::smtp::client::Tls,
+    transport::{self, smtp::client::Tls},
     Address, Message, SmtpTransport, Transport,
 };
 //use reqwest::Client;
@@ -32,7 +32,7 @@ impl EmailClient {
         subject: &str,
         html_content: impl AsRef<str>,
         text_content: impl AsRef<str>,
-    ) -> Result<(), String> {
+    ) -> Result<(), transport::smtp::Error> {
         let email = Message::builder()
             .from(Mailbox::new(
                 Some("Hiron Das".to_string()),
@@ -64,8 +64,11 @@ impl EmailClient {
 
         match self.smtp_client.send(&email) {
             Ok(_) => Ok(()),
-            Err(e) => Err(format!("Fail to send Email: {:?}", e)),
-        }
+            Err(e) => {
+                tracing::error!("Failed to send email: {}", e);
+                Err(e)
+            }
+        }   
     }
 }
 
