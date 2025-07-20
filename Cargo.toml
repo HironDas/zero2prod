@@ -18,6 +18,7 @@ opt-level = "z"
 
 [dependencies]
 actix-web = "4.11.0"
+anyhow = "1.0.98"
 chrono = "0.4.41"
 config = "0.15.11"
 lettre = "0.11.17"
